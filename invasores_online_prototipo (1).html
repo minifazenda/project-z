@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#111827" />
+  <title>Invasores Online — Protótipo</title>
+
+  <!-- Firebase Compat: funciona em um único arquivo HTML -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
+
+  <style>
+    :root {
+      --bg: #080b14;
+      --panel: rgba(18, 24, 40, .94);
+      --panel2: rgba(28, 37, 58, .94);
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --primary: #7c3aed;
+      --primary2: #a855f7;
+      --danger: #ef4444;
+      --ok: #22c55e;
+      --warning: #f59e0b;
+      --border: rgba(255,255,255,.12);
+      --shadow: 0 20px 50px rgba(0,0,0,.35);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: Inter, system-ui, Arial, sans-serif; }
+    button, input { font: inherit; }
+    button { cursor: pointer; border: 0; }
+    .hidden { display: none !important; }
+
+    body::before {
+      content: "";
+      position: fixed; inset: 0;
+      background:
+        radial-gradient(circle at 15% 20%, rgba(124,58,237,.25), transparent 35%),
+        radial-gradient(circle at 85% 75%, rgba(14,165,233,.16), transparent 35%),
+        linear-gradient(145deg, #070a12, #111827 55%, #090d18);
+      z-index: -1;
+    }
+
+    .screen {
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+      padding: 18px;
+    }
+
+    .card {
+      width: min(560px, 100%);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 26px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px);
+    }
+
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { font-size: clamp(30px, 7vw, 52px); line-height: .95; letter-spacing: -2px; margin-bottom: 10px; }
+    h1 span { color: #c084fc; }
+    .subtitle { color: var(--muted); margin-bottom: 24px; }
+
+    .field { margin-bottom: 13px; }
+    label { display: block; color: #cbd5e1; font-size: 13px; margin-bottom: 6px; }
+    input {
+      width: 100%; padding: 14px 15px;
+      color: white; background: rgba(255,255,255,.06);
+      border: 1px solid var(--border); border-radius: 14px;
+      outline: none;
+    }
+    input:focus { border-color: #a855f7; box-shadow: 0 0 0 3px rgba(168,85,247,.15); }
+
+    .row { display: flex; gap: 10px; }
+    .row > * { flex: 1; }
+
+    .btn {
+      padding: 13px 16px; border-radius: 14px;
+      color: white; font-weight: 800;
+      background: linear-gradient(135deg, var(--primary), var(--primary2));
+      box-shadow: 0 9px 20px rgba(124,58,237,.25);
+    }
+    .btn:hover { filter: brightness(1.08); }
+    .btn.secondary { background: rgba(255,255,255,.08); box-shadow: none; border: 1px solid var(--border); }
+    .btn.danger { background: var(--danger); box-shadow: none; }
+    .btn.success { background: var(--ok); box-shadow: none; }
+    .btn.warning { background: var(--warning); color: #201300; box-shadow: none; }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+
+    .notice {
+      margin-top: 15px; padding: 12px 14px;
+      border-radius: 12px; font-size: 13px; color: #dbeafe;
+      background: rgba(59,130,246,.12); border: 1px solid rgba(59,130,246,.25);
+    }
+    .error { color: #fecaca; background: rgba(239,68,68,.12); border-color: rgba(239,68,68,.3); }
+
+    /* Lobby */
+    #lobbyScreen { align-items: stretch; }
+    .lobby-wrap {
+      width: min(920px, 100%); height: 100%;
+      display: grid; grid-template-columns: 1.15fr .85fr; gap: 14px;
+    }
+    .panel {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 22px; padding: 18px; box-shadow: var(--shadow);
+      min-height: 0;
+    }
+    .room-code {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 9px 13px; border-radius: 12px;
+      background: rgba(168,85,247,.14); border: 1px solid rgba(168,85,247,.35);
+      font-size: 20px; font-weight: 900; letter-spacing: 3px;
+    }
+    .players { display: grid; gap: 9px; max-height: calc(100vh - 230px); overflow: auto; margin-top: 15px; }
+    .player-item {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 10px; padding: 11px 12px; border-radius: 13px;
+      background: rgba(255,255,255,.055); border: 1px solid transparent;
+    }
+    .player-item.me { border-color: rgba(168,85,247,.5); }
+    .badge { font-size: 11px; font-weight: 900; padding: 4px 8px; border-radius: 999px; background: rgba(255,255,255,.1); }
+    .badge.ok { background: rgba(34,197,94,.18); color: #86efac; }
+    .badge.host { background: rgba(245,158,11,.18); color: #fcd34d; }
+
+    .chat-box {
+      display: flex; flex-direction: column; height: 100%;
+    }
+    .messages {
+      flex: 1; overflow: auto; min-height: 180px;
+      background: rgba(0,0,0,.18); border-radius: 14px;
+      padding: 12px; border: 1px solid var(--border);
+    }
+    .msg { margin-bottom: 9px; line-height: 1.3; overflow-wrap: anywhere; }
+    .msg b { color: #d8b4fe; }
+    .msg small { color: var(--muted); margin-left: 6px; }
+    .chat-input { display: flex; gap: 8px; margin-top: 10px; }
+    .chat-input input { flex: 1; }
+
+    /* Game */
+    #gameScreen { padding: 0; position: relative; }
+    #gameCanvas { width: 100%; height: 100%; display: block; background: #111827; touch-action: none; }
+
+    .hud {
+      position: absolute; top: 10px; left: 10px; right: 10px;
+      display: flex; justify-content: space-between; align-items: flex-start;
+      gap: 10px; pointer-events: none;
+    }
+    .hud-card {
+      pointer-events: auto;
+      background: rgba(8,11,20,.82); border: 1px solid var(--border);
+      border-radius: 14px; padding: 10px 12px; backdrop-filter: blur(10px);
+      box-shadow: 0 10px 25px rgba(0,0,0,.25);
+    }
+    .role { font-weight: 1000; }
+    .role.impostor { color: #f87171; }
+    .role.crew { color: #60a5fa; }
+    .taskbar {
+      width: 190px; height: 10px; border-radius: 999px; overflow: hidden;
+      background: rgba(255,255,255,.1); margin-top: 7px;
+    }
+    .taskbar > div { height: 100%; width: 0%; background: #22c55e; transition: width .25s; }
+
+    .game-actions {
+      position: absolute; right: 14px; bottom: 18px;
+      display: grid; gap: 9px; width: 145px;
+    }
+
+    .joystick {
+      position: absolute; left: 22px; bottom: 24px;
+      width: 132px; height: 132px; border-radius: 50%;
+      background: rgba(255,255,255,.08); border: 2px solid rgba(255,255,255,.14);
+      touch-action: none; display: none;
+    }
+    .stick {
+      position: absolute; left: 38px; top: 38px;
+      width: 54px; height: 54px; border-radius: 50%;
+      background: rgba(255,255,255,.28); border: 2px solid rgba(255,255,255,.28);
+      transform: translate(0,0);
+    }
+
+    .toast {
+      position: absolute; left: 50%; top: 22%;
+      transform: translate(-50%, -50%);
+      padding: 11px 16px; border-radius: 12px;
+      background: rgba(0,0,0,.78); border: 1px solid var(--border);
+      font-weight: 800; opacity: 0; pointer-events: none;
+      transition: opacity .2s;
+    }
+    .toast.show { opacity: 1; }
+
+    /* Meeting */
+    .overlay {
+      position: fixed; inset: 0; z-index: 20;
+      background: rgba(3,5,10,.88); backdrop-filter: blur(10px);
+      display: flex; align-items: center; justify-content: center; padding: 18px;
+    }
+    .meeting-card {
+      width: min(620px, 100%); max-height: 90vh; overflow: auto;
+      background: var(--panel2); border: 1px solid var(--border);
+      border-radius: 22px; padding: 20px; box-shadow: var(--shadow);
+    }
+    .vote-list { display: grid; gap: 8px; margin: 14px 0; }
+    .vote-btn {
+      display: flex; justify-content: space-between; align-items: center;
+      width: 100%; text-align: left; padding: 12px;
+      border-radius: 12px; color: white;
+      background: rgba(255,255,255,.07); border: 1px solid var(--border);
+    }
+    .vote-btn.selected { outline: 2px solid #a855f7; }
+    .vote-btn.dead { opacity: .4; text-decoration: line-through; }
+
+    .result-title { font-size: clamp(38px, 10vw, 72px); text-align: center; font-weight: 1000; letter-spacing: -2px; }
+    .result-title.crew { color: #60a5fa; }
+    .result-title.impostor { color: #f87171; }
+
+    @media (max-width: 760px) {
+      .screen { padding: 10px; }
+      .lobby-wrap { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+      .players { max-height: 28vh; }
+      .panel { padding: 14px; border-radius: 17px; }
+      .joystick { display: block; }
+      .hud { flex-wrap: wrap; }
+      .taskbar { width: 120px; }
+      .game-actions { width: 128px; }
+      .game-actions .btn { padding: 11px 8px; font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+  <!-- TELA INICIAL -->
+  <section id="homeScreen" class="screen">
+    <div class="card">
+      <h1>INVASORES <span>ONLINE</span></h1>
+      <p class="subtitle">Protótipo multiplayer para 4–10 amigos.</p>
+
+      <div class="field">
+        <label for="playerName">Seu nome</label>
+        <input id="playerName" maxlength="16" placeholder="Ex.: Rodrigo" autocomplete="nickname" />
+      </div>
+
+      <div class="row">
+        <button id="createRoomBtn" class="btn">Criar sala</button>
+        <button id="showJoinBtn" class="btn secondary">Entrar em sala</button>
+      </div>
+
+      <div id="joinArea" class="hidden" style="margin-top:13px">
+        <div class="field">
+          <label for="roomCodeInput">Código da sala</label>
+          <input id="roomCodeInput" maxlength="6" placeholder="ABC123" style="text-transform:uppercase;letter-spacing:3px;font-weight:900" />
+        </div>
+        <button id="joinRoomBtn" class="btn" style="width:100%">Entrar</button>
+      </div>
+
+      <div id="statusBox" class="notice">Conectando ao Firebase…</div>
+    </div>
+  </section>
+
+  <!-- LOBBY -->
+  <section id="lobbyScreen" class="screen hidden">
+    <div class="lobby-wrap">
+      <div class="panel">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
+          <div>
+            <div style="color:var(--muted);font-size:12px">SALA</div>
+            <div id="roomCodeLabel" class="room-code">------</div>
+          </div>
+          <button id="copyCodeBtn" class="btn secondary">Copiar código</button>
+        </div>
+
+        <div id="playersList" class="players"></div>
+
+        <div style="display:grid;gap:9px;margin-top:14px">
+          <button id="readyBtn" class="btn secondary">Estou pronto</button>
+          <button id="startGameBtn" class="btn success hidden">Iniciar partida</button>
+          <button id="leaveRoomBtn" class="btn danger">Sair da sala</button>
+        </div>
+      </div>
+
+      <div class="panel chat-box">
+        <h3 style="margin-bottom:10px">Chat da sala</h3>
+        <div id="lobbyMessages" class="messages"></div>
+        <div class="chat-input">
+          <input id="lobbyChatInput" maxlength="120" placeholder="Escreva uma mensagem…" />
+          <button id="sendLobbyChatBtn" class="btn">Enviar</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- JOGO -->
+  <section id="gameScreen" class="screen hidden">
+    <canvas id="gameCanvas"></canvas>
+
+    <div class="hud">
+      <div class="hud-card">
+        <div id="roleLabel" class="role">Cargo: —</div>
+        <div id="aliveLabel" style="font-size:12px;color:var(--muted);margin-top:3px">Vivo</div>
+      </div>
+      <div class="hud-card">
+        <div style="font-size:12px;color:var(--muted)">Tarefas da tripulação</div>
+        <div class="taskbar"><div id="taskProgress"></div></div>
+      </div>
+      <div class="hud-card">
+        <div id="gameRoomLabel" style="font-weight:900">Sala ------</div>
+        <div id="playerCountLabel" style="font-size:12px;color:var(--muted)">0 jogadores</div>
+      </div>
+    </div>
+
+    <div id="joystick" class="joystick"><div id="stick" class="stick"></div></div>
+
+    <div class="game-actions">
+      <button id="taskBtn" class="btn success" disabled>Fazer tarefa</button>
+      <button id="eliminateBtn" class="btn danger hidden" disabled>Eliminar</button>
+      <button id="meetingBtn" class="btn warning">Reunião</button>
+      <button id="gameChatBtn" class="btn secondary">Chat</button>
+    </div>
+
+    <div id="toast" class="toast"></div>
+  </section>
+
+  <!-- CHAT DURANTE JOGO -->
+  <div id="gameChatOverlay" class="overlay hidden">
+    <div class="meeting-card chat-box" style="height:min(650px,90vh)">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h2>Chat</h2>
+        <button id="closeGameChatBtn" class="btn secondary">Fechar</button>
+      </div>
+      <div id="gameMessages" class="messages"></div>
+      <div class="chat-input">
+        <input id="gameChatInput" maxlength="120" placeholder="Escreva uma mensagem…" />
+        <button id="sendGameChatBtn" class="btn">Enviar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- REUNIÃO / VOTAÇÃO -->
+  <div id="meetingOverlay" class="overlay hidden">
+    <div class="meeting-card">
+      <h2>Reunião de emergência</h2>
+      <p id="meetingInfo" style="color:var(--muted)">Converse e escolha quem expulsar.</p>
+      <div id="voteList" class="vote-list"></div>
+      <button id="skipVoteBtn" class="btn secondary" style="width:100%">Pular voto</button>
+      <div id="voteStatus" class="notice">Aguardando votos…</div>
+    </div>
+  </div>
+
+  <!-- RESULTADO -->
+  <div id="resultOverlay" class="overlay hidden">
+    <div class="meeting-card">
+      <div id="resultTitle" class="result-title">FIM</div>
+      <p id="resultText" style="text-align:center;color:var(--muted);font-size:18px"></p>
+      <button id="backLobbyBtn" class="btn" style="width:100%">Voltar ao lobby</button>
+    </div>
+  </div>
+
+<script>
+/*
+===============================================================================
+CONFIGURAÇÃO IMPORTANTE
+===============================================================================
+1) No Firebase Console, ative:
+   - Authentication > Método de login > Anônimo
+   - Realtime Database
+
+2) Cole no Realtime Database > Regras:
+{
+  "rules": {
+    ".read": "auth != null",
+    ".write": "auth != null"
+  }
+}
+
+3) Se o seu endereço do Realtime Database for diferente, altere databaseURL abaixo.
+   O console mostra o endereço no topo da página do Realtime Database.
+
+4) Para multiplayer real, abra este arquivo por um servidor ou publique no Hosting.
+   Abrir diretamente por file:// pode ser bloqueado pelo navegador/Firebase.
+===============================================================================
+*/
+
+const firebaseConfig = {
+  apiKey: "AIzaSyADIz3OUQwW1y5nODPLVRTfYFHa6Yr8o0o",
+  authDomain: "project-1-34299.firebaseapp.com",
+  databaseURL: "https://project-1-34299-default-rtdb.firebaseio.com",
+  projectId: "project-1-34299",
+  storageBucket: "project-1-34299.firebasestorage.app",
+  messagingSenderId: "764206074052",
+  appId: "1:764206074052:web:b9059264c6d39e06cbe191",
+  measurementId: "G-5J12FTK8X8"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.database();
+
+const $ = (id) => document.getElementById(id);
+const screens = {
+  home: $("homeScreen"),
+  lobby: $("lobbyScreen"),
+  game: $("gameScreen")
+};
+
+const state = {
+  uid: null,
+  name: "",
+  roomCode: null,
+  room: null,
+  me: null,
+  players: {},
+  host: false,
+  roomRef: null,
+  playerRef: null,
+  listeners: [],
+  gameLoop: null,
+  lastFrame: performance.now(),
+  lastSync: 0,
+  keys: {},
+  joyX: 0,
+  joyY: 0,
+  localX: 300,
+  localY: 300,
+  speed: 205,
+  selectedVote: null,
+  meetingCooldown: false,
+  taskCooldown: false,
+  killCooldownUntil: 0,
+  colors: ["#8b5cf6","#06b6d4","#22c55e","#f59e0b","#ef4444","#ec4899","#3b82f6","#84cc16","#f97316","#a78bfa"]
+};
+
+const MAP = {
+  width: 1200,
+  height: 760,
+  walls: [
+    {x:0,y:0,w:1200,h:30}, {x:0,y:730,w:1200,h:30},
+    {x:0,y:0,w:30,h:760}, {x:1170,y:0,w:30,h:760},
+    {x:230,y:120,w:250,h:42}, {x:720,y:115,w:260,h:42},
+    {x:490,y:300,w:220,h:46}, {x:170,y:500,w:260,h:42},
+    {x:770,y:500,w:250,h:42}, {x:560,y:610,w:80,h:120}
+  ],
+  tasks: [
+    {id:"t1",x:105,y:110,label:"Painel elétrico"},
+    {id:"t2",x:1080,y:105,label:"Antena"},
+    {id:"t3",x:105,y:650,label:"Motores"},
+    {id:"t4",x:1090,y:650,label:"Oxigênio"},
+    {id:"t5",x:600,y:220,label:"Comando"},
+    {id:"t6",x:600,y:540,label:"Laboratório"}
+  ]
+};
+
+function switchScreen(name) {
+  Object.values(screens).forEach(el => el.classList.add("hidden"));
+  screens[name].classList.remove("hidden");
+}
+
+function setStatus(message, isError=false) {
+  const box = $("statusBox");
+  box.textContent = message;
+  box.classList.toggle("error", isError);
+}
+
+function cleanName(v) {
+  return String(v || "").trim().replace(/[<>]/g, "").slice(0,16);
+}
+
+function cleanMessage(v) {
+  return String(v || "").trim().replace(/[<>]/g, "").slice(0,120);
+}
+
+function generateRoomCode() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let out = "";
+  for (let i=0;i<6;i++) out += chars[Math.floor(Math.random()*chars.length)];
+  return out;
+}
+
+function randomSpawn(index=0) {
+  const points = [
+    [130,240],[1070,240],[130,420],[1070,420],[520,190],
+    [680,190],[520,650],[680,650],[350,390],[850,390]
+  ];
+  const p = points[index % points.length];
+  return {x:p[0], y:p[1]};
+}
+
+function serverTime() {
+  return firebase.database.ServerValue.TIMESTAMP;
+}
+
+function showToast(text, ms=1800) {
+  const el = $("toast");
+  el.textContent = text;
+  el.classList.add("show");
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(()=>el.classList.remove("show"), ms);
+}
+
+async function ensureAuth() {
+  if (auth.currentUser) return auth.currentUser;
+  const cred = await auth.signInAnonymously();
+  return cred.user;
+}
+
+auth.onAuthStateChanged(user => {
+  if (user) {
+    state.uid = user.uid;
+    setStatus("Firebase conectado. Já pode criar ou entrar em uma sala.");
+  }
+});
+
+async function createRoom() {
+  try {
+    const name = cleanName($("playerName").value);
+    if (!name) return setStatus("Digite seu nome primeiro.", true);
+    setStatus("Criando sala…");
+    await ensureAuth();
+
+    let code, exists = true;
+    for (let tries=0; tries<8 && exists; tries++) {
+      code = generateRoomCode();
+      const snap = await db.ref(`rooms/${code}`).once("value");
+      exists = snap.exists();
+    }
+    if (exists) throw new Error("Não foi possível gerar código livre.");
+
+    const spawn = randomSpawn(0);
+    const roomData = {
+      createdAt: serverTime(),
+      hostId: state.uid,
+      status: "lobby",
+      maxPlayers: 10,
+      taskGoal: 12,
+      meetingNumber: 0
+    };
+    const playerData = {
+      name,
+      color: state.colors[0],
+      ready: false,
+      alive: true,
+      role: "crew",
+      x: spawn.x, y: spawn.y,
+      joinedAt: serverTime(),
+      tasksDone: 0
+    };
+
+    const updates = {};
+    updates[`rooms/${code}`] = roomData;
+    updates[`rooms/${code}/players/${state.uid}`] = playerData;
+    await db.ref().update(updates);
+    await enterRoomLocal(code, name);
+  } catch (err) {
+    console.error(err);
+    setStatus("Erro ao criar sala: " + friendlyFirebaseError(err), true);
+  }
+}
+
+async function joinRoom() {
+  try {
+    const name = cleanName($("playerName").value);
+    const code = $("roomCodeInput").value.trim().toUpperCase();
+    if (!name) return setStatus("Digite seu nome primeiro.", true);
+    if (code.length !== 6) return setStatus("Digite um código de 6 caracteres.", true);
+    setStatus("Entrando na sala…");
+    await ensureAuth();
+
+    const roomSnap = await db.ref(`rooms/${code}`).once("value");
+    if (!roomSnap.exists()) throw new Error("Sala não encontrada.");
+    const room = roomSnap.val();
+    if (room.status !== "lobby") throw new Error("A partida dessa sala já começou.");
+
+    const players = room.players || {};
+    if (!players[state.uid] && Object.keys(players).length >= (room.maxPlayers || 10)) {
+      throw new Error("A sala está cheia.");
+    }
+
+    const index = Object.keys(players).length;
+    const spawn = randomSpawn(index);
+    await db.ref(`rooms/${code}/players/${state.uid}`).set({
+      name,
+      color: state.colors[index % state.colors.length],
+      ready: false,
+      alive: true,
+      role: "crew",
+      x: spawn.x, y: spawn.y,
+      joinedAt: serverTime(),
+      tasksDone: 0
+    });
+    await enterRoomLocal(code, name);
+  } catch (err) {
+    console.error(err);
+    setStatus("Não foi possível entrar: " + friendlyFirebaseError(err), true);
+  }
+}
+
+function friendlyFirebaseError(err) {
+  const msg = err?.message || String(err);
+  if (msg.includes("CONFIGURATION_NOT_FOUND")) return "ative o login Anônimo no Firebase Authentication.";
+  if (msg.includes("PERMISSION_DENIED")) return "confira as regras do Realtime Database.";
+  if (msg.includes("network")) return "verifique sua internet.";
+  return msg;
+}
+
+async function enterRoomLocal(code, name) {
+  cleanupListeners();
+  state.roomCode = code;
+  state.name = name;
+  state.roomRef = db.ref(`rooms/${code}`);
+  state.playerRef = db.ref(`rooms/${code}/players/${state.uid}`);
+
+  state.playerRef.onDisconnect().remove();
+  localStorage.setItem("invasores_name", name);
+
+  $("roomCodeLabel").textContent = code;
+  $("gameRoomLabel").textContent = `Sala ${code}`;
+  switchScreen("lobby");
+  attachRoomListeners();
+}
+
+function attachRoomListeners() {
+  const roomCb = state.roomRef.on("value", snap => {
+    if (!snap.exists()) {
+      alert("A sala foi encerrada.");
+      leaveRoom(false);
+      return;
+    }
+
+    state.room = snap.val();
+    state.players = state.room.players || {};
+    state.me = state.players[state.uid] || null;
+    state.host = state.room.hostId === state.uid;
+
+    if (!state.me) {
+      leaveRoom(false);
+      return;
+    }
+
+    renderLobby();
+    updateHUD();
+
+    if (state.room.status === "playing") {
+      if (screens.game.classList.contains("hidden")) startGameView();
+    } else if (state.room.status === "meeting") {
+      if (screens.game.classList.contains("hidden")) startGameView();
+      openMeeting();
+    } else if (state.room.status === "ended") {
+      showResult(state.room.winner);
+    } else if (state.room.status === "lobby") {
+      $("meetingOverlay").classList.add("hidden");
+      $("resultOverlay").classList.add("hidden");
+      if (!screens.lobby.classList.contains("hidden")) return;
+      stopGameLoop();
+      switchScreen("lobby");
+    }
+
+    if (state.room.status === "meeting") maybeFinalizeVote();
+  });
+
+  const lobbyChatRef = state.roomRef.child("chat").limitToLast(60);
+  const chatCb = lobbyChatRef.on("value", snap => renderMessages(snap.val(), "lobbyMessages"));
+
+  state.listeners.push([state.roomRef, "value", roomCb]);
+  state.listeners.push([lobbyChatRef, "value", chatCb]);
+}
+
+function renderLobby() {
+  const list = $("playersList");
+  list.innerHTML = "";
+  const entries = Object.entries(state.players).sort((a,b)=>(a[1].joinedAt||0)-(b[1].joinedAt||0));
+
+  for (const [uid,p] of entries) {
+    const item = document.createElement("div");
+    item.className = "player-item" + (uid === state.uid ? " me" : "");
+    const left = document.createElement("div");
+    left.innerHTML = `<b>${escapeHtml(p.name)}</b><div style="font-size:12px;color:var(--muted)">${p.alive === false ? "Eliminado" : "Na sala"}</div>`;
+    const right = document.createElement("div");
+    right.style.display = "flex";
+    right.style.gap = "6px";
+    if (uid === state.room.hostId) right.innerHTML += `<span class="badge host">DONO</span>`;
+    right.innerHTML += `<span class="badge ${p.ready ? "ok" : ""}">${p.ready ? "PRONTO" : "AGUARDANDO"}</span>`;
+    item.append(left,right);
+    list.appendChild(item);
+  }
+
+  $("readyBtn").textContent = state.me?.ready ? "Cancelar pronto" : "Estou pronto";
+  $("readyBtn").classList.toggle("success", !!state.me?.ready);
+  $("startGameBtn").classList.toggle("hidden", !state.host);
+
+  const canStart = entries.length >= 2 && entries.every(([,p])=>p.ready);
+  $("startGameBtn").disabled = !canStart;
+  $("startGameBtn").textContent = entries.length < 2 ? "Precisa de 2 jogadores" : canStart ? "Iniciar partida" : "Todos precisam estar prontos";
+}
+
+async function toggleReady() {
+  if (!state.playerRef || !state.me) return;
+  await state.playerRef.child("ready").set(!state.me.ready);
+}
+
+async function startMatch() {
+  if (!state.host || !state.room) return;
+  const players = Object.entries(state.players);
+  if (players.length < 2 || !players.every(([,p])=>p.ready)) return;
+
+  const shuffled = [...players].sort(()=>Math.random()-.5);
+  const impostorCount = players.length >= 7 ? 2 : 1;
+  const impostors = new Set(shuffled.slice(0,impostorCount).map(([uid])=>uid));
+
+  const updates = {
+    status: "playing",
+    winner: null,
+    startedAt: serverTime(),
+    totalTasksDone: 0,
+    votes: null,
+    meetingNumber: 0,
+    emergencyUsed: null
+  };
+
+  players.forEach(([uid,p], index) => {
+    const spawn = randomSpawn(index);
+    updates[`players/${uid}/role`] = impostors.has(uid) ? "impostor" : "crew";
+    updates[`players/${uid}/alive`] = true;
+    updates[`players/${uid}/ready`] = false;
+    updates[`players/${uid}/tasksDone`] = 0;
+    updates[`players/${uid}/x`] = spawn.x;
+    updates[`players/${uid}/y`] = spawn.y;
+  });
+
+  await state.roomRef.update(updates);
+}
+
+function startGameView() {
+  switchScreen("game");
+  state.localX = Number(state.me?.x || 300);
+  state.localY = Number(state.me?.y || 300);
+  $("meetingOverlay").classList.add("hidden");
+  $("resultOverlay").classList.add("hidden");
+  setupCanvas();
+  startGameLoop();
+  showToast(state.me?.role === "impostor" ? "Você é um INVASOR" : "Você é da TRIPULAÇÃO", 2600);
+}
+
+function setupCanvas() {
+  const canvas = $("gameCanvas");
+  const resize = () => {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.floor(innerWidth * dpr);
+    canvas.height = Math.floor(innerHeight * dpr);
+    canvas.style.width = innerWidth + "px";
+    canvas.style.height = innerHeight + "px";
+  };
+  resize();
+  window.addEventListener("resize", resize, {passive:true});
+}
+
+function startGameLoop() {
+  if (state.gameLoop) return;
+  state.lastFrame = performance.now();
+  const loop = (now) => {
+    state.gameLoop = requestAnimationFrame(loop);
+    const dt = Math.min((now-state.lastFrame)/1000, .04);
+    state.lastFrame = now;
+    updateGame(dt, now);
+    drawGame();
+  };
+  state.gameLoop = requestAnimationFrame(loop);
+}
+
+function stopGameLoop() {
+  if (state.gameLoop) cancelAnimationFrame(state.gameLoop);
+  state.gameLoop = null;
+}
+
+function updateGame(dt, now) {
+  if (!state.me || !state.room || state.room.status !== "playing" || state.me.alive === false) {
+    updateActionButtons(now);
+    return;
+  }
+
+  let dx = 0, dy = 0;
+  if (state.keys["arrowleft"] || state.keys["a"]) dx -= 1;
+  if (state.keys["arrowright"] || state.keys["d"]) dx += 1;
+  if (state.keys["arrowup"] || state.keys["w"]) dy -= 1;
+  if (state.keys["arrowdown"] || state.keys["s"]) dy += 1;
+  dx += state.joyX;
+  dy += state.joyY;
+
+  const len = Math.hypot(dx,dy);
+  if (len > 1) { dx/=len; dy/=len; }
+
+  const oldX = state.localX, oldY = state.localY;
+  moveWithCollision(dx * state.speed * dt, dy * state.speed * dt);
+
+  if ((oldX !== state.localX || oldY !== state.localY) && now-state.lastSync > 90) {
+    state.lastSync = now;
+    state.playerRef.update({
+      x: Math.round(state.localX*10)/10,
+      y: Math.round(state.localY*10)/10
+    }).catch(()=>{});
+  }
+
+  updateActionButtons(now);
+}
+
+function moveWithCollision(dx,dy) {
+  const r = 18;
+  let nx = state.localX + dx;
+  if (!circleHitsWall(nx,state.localY,r)) state.localX = nx;
+  let ny = state.localY + dy;
+  if (!circleHitsWall(state.localX,ny,r)) state.localY = ny;
+}
+
+function circleHitsWall(cx,cy,r) {
+  for (const w of MAP.walls) {
+    const qx = Math.max(w.x, Math.min(cx, w.x+w.w));
+    const qy = Math.max(w.y, Math.min(cy, w.y+w.h));
+    if ((cx-qx)**2 + (cy-qy)**2 < r*r) return true;
+  }
+  return false;
+}
+
+function getCamera() {
+  const canvas = $("gameCanvas");
+  const dpr = canvas.width / Math.max(1, innerWidth);
+  const viewW = canvas.width/dpr;
+  const viewH = canvas.height/dpr;
+  const x = Math.max(0, Math.min(MAP.width-viewW, state.localX-viewW/2));
+  const y = Math.max(0, Math.min(MAP.height-viewH, state.localY-viewH/2));
+  return {x,y,dpr,viewW,viewH};
+}
+
+function drawGame() {
+  const canvas = $("gameCanvas");
+  const ctx = canvas.getContext("2d");
+  const cam = getCamera();
+  ctx.setTransform(cam.dpr,0,0,cam.dpr,0,0);
+  ctx.clearRect(0,0,cam.viewW,cam.viewH);
+
+  ctx.save();
+  ctx.translate(-cam.x,-cam.y);
+
+  // Chão
+  ctx.fillStyle = "#111827";
+  ctx.fillRect(0,0,MAP.width,MAP.height);
+  ctx.strokeStyle = "rgba(255,255,255,.035)";
+  ctx.lineWidth = 1;
+  for (let x=0;x<MAP.width;x+=50) { ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,MAP.height);ctx.stroke(); }
+  for (let y=0;y<MAP.height;y+=50) { ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(MAP.width,y);ctx.stroke(); }
+
+  // Áreas
+  drawRoom(ctx,50,55,380,360,"MOTORES");
+  drawRoom(ctx,770,55,380,360,"COMUNICAÇÕES");
+  drawRoom(ctx,50,455,380,245,"ENERGIA");
+  drawRoom(ctx,770,455,380,245,"OXIGÊNIO");
+  drawRoom(ctx,465,175,270,400,"CENTRAL");
+
+  // Paredes
+  for (const w of MAP.walls) {
+    ctx.fillStyle = "#374151";
+    ctx.fillRect(w.x,w.y,w.w,w.h);
+    ctx.fillStyle = "rgba(255,255,255,.08)";
+    ctx.fillRect(w.x,w.y,w.w,5);
+  }
+
+  // Tarefas
+  for (const t of MAP.tasks) {
+    const glow = Math.sin(performance.now()/250)*3 + 13;
+    ctx.beginPath();
+    ctx.arc(t.x,t.y,glow,0,Math.PI*2);
+    ctx.fillStyle = "rgba(34,197,94,.18)";
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(t.x,t.y,8,0,Math.PI*2);
+    ctx.fillStyle = "#22c55e";
+    ctx.fill();
+    ctx.font = "12px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#bbf7d0";
+    ctx.fillText(t.label,t.x,t.y-18);
+  }
+
+  // Jogadores
+  for (const [uid,p] of Object.entries(state.players || {})) {
+    const x = uid === state.uid ? state.localX : Number(p.x||0);
+    const y = uid === state.uid ? state.localY : Number(p.y||0);
+    drawPlayer(ctx,x,y,p,uid===state.uid);
+  }
+
+  ctx.restore();
+
+  // Escurece tela se morto
+  if (state.me?.alive === false) {
+    ctx.fillStyle = "rgba(80,0,0,.22)";
+    ctx.fillRect(0,0,cam.viewW,cam.viewH);
+  }
+}
+
+function drawRoom(ctx,x,y,w,h,label) {
+  ctx.fillStyle = "rgba(30,41,59,.58)";
+  ctx.fillRect(x,y,w,h);
+  ctx.strokeStyle = "rgba(148,163,184,.13)";
+  ctx.strokeRect(x,y,w,h);
+  ctx.font = "800 15px system-ui";
+  ctx.fillStyle = "rgba(255,255,255,.12)";
+  ctx.textAlign = "left";
+  ctx.fillText(label,x+16,y+26);
+}
+
+function drawPlayer(ctx,x,y,p,isMe) {
+  ctx.save();
+  if (p.alive === false) ctx.globalAlpha = .36;
+
+  if (isMe) {
+    ctx.beginPath();
+    ctx.arc(x,y,27,0,Math.PI*2);
+    ctx.strokeStyle = "rgba(255,255,255,.7)";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  }
+
+  // corpo
+  ctx.beginPath();
+  ctx.arc(x,y,18,0,Math.PI*2);
+  ctx.fillStyle = p.color || "#8b5cf6";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(0,0,0,.45)";
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  // visor
+  ctx.beginPath();
+  ctx.ellipse(x+7,y-5,8,6,0,0,Math.PI*2);
+  ctx.fillStyle = "#bae6fd";
+  ctx.fill();
+
+  // nome
+  ctx.font = "700 13px system-ui";
+  ctx.textAlign = "center";
+  ctx.fillStyle = "white";
+  ctx.fillText(p.name || "Jogador",x,y-28);
+
+  if (p.alive === false) {
+    ctx.strokeStyle = "#ef4444";
+    ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(x-13,y-13); ctx.lineTo(x+13,y+13); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x+13,y-13); ctx.lineTo(x-13,y+13); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function updateActionButtons(now) {
+  const alive = state.me?.alive !== false;
+  const role = state.me?.role;
+  const canPlay = state.room?.status === "playing" && alive;
+
+  $("taskBtn").classList.toggle("hidden", role === "impostor");
+  $("eliminateBtn").classList.toggle("hidden", role !== "impostor");
+
+  const task = nearestTask();
+  $("taskBtn").disabled = !canPlay || !task || state.taskCooldown;
+  $("taskBtn").textContent = task ? `Fazer: ${task.label}` : "Aproxime-se da tarefa";
+
+  const target = nearestVictim();
+  const cooldown = Math.max(0, Math.ceil((state.killCooldownUntil-now)/1000));
+  $("eliminateBtn").disabled = !canPlay || !target || cooldown > 0;
+  $("eliminateBtn").textContent = cooldown > 0 ? `Recarga ${cooldown}s` : target ? `Eliminar ${target.player.name}` : "Aproxime-se";
+
+  $("meetingBtn").disabled = !canPlay || !!state.room?.emergencyUsed?.[state.uid] || state.meetingCooldown;
+}
+
+function nearestTask() {
+  if (!state.me || state.me.role !== "crew") return null;
+  let best=null, bestD=Infinity;
+  for (const t of MAP.tasks) {
+    const d=Math.hypot(state.localX-t.x,state.localY-t.y);
+    if (d<bestD) {best=t;bestD=d;}
+  }
+  return bestD<=58 ? best : null;
+}
+
+function nearestVictim() {
+  if (!state.me || state.me.role !== "impostor") return null;
+  let best=null,bestD=Infinity;
+  for (const [uid,p] of Object.entries(state.players||{})) {
+    if (uid===state.uid || p.alive===false || p.role==="impostor") continue;
+    const d=Math.hypot(state.localX-Number(p.x||0),state.localY-Number(p.y||0));
+    if (d<bestD) {best={uid,player:p};bestD=d;}
+  }
+  return bestD<=55 ? best : null;
+}
+
+async function performTask() {
+  if (state.taskCooldown || state.me?.role !== "crew" || state.me?.alive === false) return;
+  const task = nearestTask();
+  if (!task) return;
+  state.taskCooldown = true;
+  $("taskBtn").disabled = true;
+  showToast("Executando tarefa…",1200);
+
+  setTimeout(async()=>{
+    try {
+      const totalRef = state.roomRef.child("totalTasksDone");
+      await totalRef.transaction(v=>(Number(v)||0)+1);
+      await state.playerRef.child("tasksDone").transaction(v=>(Number(v)||0)+1);
+      showToast("Tarefa concluída!");
+      state.taskCooldown = false;
+      await checkWinConditions();
+    } catch(e) {
+      state.taskCooldown = false;
+    }
+  },1200);
+}
+
+async function eliminatePlayer() {
+  if (state.me?.role !== "impostor" || state.me?.alive === false || performance.now()<state.killCooldownUntil) return;
+  const target = nearestVictim();
+  if (!target) return;
+  state.killCooldownUntil = performance.now()+15000;
+  await state.roomRef.child(`players/${target.uid}/alive`).set(false);
+  await sendChat(`${state.me.name} encontrou um jogador caído.`, true);
+  showToast(`${target.player.name} foi eliminado`);
+  await checkWinConditions();
+}
+
+async function callMeeting() {
+  if (state.me?.alive === false || state.room?.status !== "playing" || state.room?.emergencyUsed?.[state.uid]) return;
+  const updates = {
+    status: "meeting",
+    votes: null,
+    meetingCalledBy: state.uid,
+    [`emergencyUsed/${state.uid}`]: true,
+    meetingNumber: (state.room.meetingNumber||0)+1
+  };
+  await state.roomRef.update(updates);
+}
+
+function openMeeting() {
+  $("meetingOverlay").classList.remove("hidden");
+  const caller = state.players[state.room.meetingCalledBy];
+  $("meetingInfo").textContent = caller ? `${caller.name} convocou a reunião. Escolha quem expulsar.` : "Escolha quem expulsar.";
+  renderVoteList();
+  renderVoteStatus();
+}
+
+function renderVoteList() {
+  const list=$("voteList");
+  list.innerHTML="";
+  for (const [uid,p] of Object.entries(state.players||{})) {
+    const btn=document.createElement("button");
+    btn.className="vote-btn" + (p.alive===false ? " dead" : "") + (state.selectedVote===uid ? " selected" : "");
+    btn.disabled = p.alive===false || state.me?.alive===false || !!state.room?.votes?.[state.uid];
+    btn.innerHTML=`<span><b>${escapeHtml(p.name)}</b>${uid===state.uid?" (você)":""}</span><span>${p.alive===false?"ELIMINADO":"VOTAR"}</span>`;
+    btn.onclick=()=>submitVote(uid);
+    list.appendChild(btn);
+  }
+}
+
+async function submitVote(targetUid) {
+  if (state.me?.alive===false || state.room?.votes?.[state.uid]) return;
+  state.selectedVote=targetUid;
+  await state.roomRef.child(`votes/${state.uid}`).set(targetUid);
+}
+
+async function skipVote() {
+  if (state.me?.alive===false || state.room?.votes?.[state.uid]) return;
+  state.selectedVote="skip";
+  await state.roomRef.child(`votes/${state.uid}`).set("skip");
+}
+
+function renderVoteStatus() {
+  const alivePlayers=Object.entries(state.players||{}).filter(([,p])=>p.alive!==false);
+  const votes=state.room?.votes||{};
+  const voted=alivePlayers.filter(([uid])=>votes[uid]).length;
+  $("voteStatus").textContent=`${voted}/${alivePlayers.length} jogadores votaram.`;
+  $("skipVoteBtn").disabled=state.me?.alive===false || !!votes[state.uid];
+  renderVoteList();
+}
+
+let finalizingVote=false;
+async function maybeFinalizeVote() {
+  renderVoteStatus();
+  if (!state.host || finalizingVote || state.room?.status!=="meeting") return;
+  const alive=Object.entries(state.players||{}).filter(([,p])=>p.alive!==false);
+  const votes=state.room.votes||{};
+  if (!alive.every(([uid])=>votes[uid])) return;
+
+  finalizingVote=true;
+  const counts={};
+  Object.values(votes).forEach(v=>counts[v]=(counts[v]||0)+1);
+  const sorted=Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  let ejected=null;
+  if (sorted[0] && sorted[0][0]!=="skip") {
+    const tied=sorted[1] && sorted[1][1]===sorted[0][1];
+    if (!tied) ejected=sorted[0][0];
+  }
+
+  const updates={votes:null,meetingCalledBy:null};
+  let text="Ninguém foi expulso.";
+  if (ejected && state.players[ejected]) {
+    updates[`players/${ejected}/alive`]=false;
+    text=`${state.players[ejected].name} foi expulso.`;
+  }
+  updates.status="playing";
+  updates.lastMeetingResult=text;
+  await state.roomRef.update(updates);
+  await sendChat(text,true);
+  $("meetingOverlay").classList.add("hidden");
+  finalizingVote=false;
+  showToast(text,2600);
+  setTimeout(checkWinConditions,300);
+}
+
+async function checkWinConditions() {
+  if (!state.host || !state.room || state.room.status==="ended") return;
+  const all=Object.values(state.players||{});
+  const aliveImpostors=all.filter(p=>p.alive!==false && p.role==="impostor").length;
+  const aliveCrew=all.filter(p=>p.alive!==false && p.role!=="impostor").length;
+  const totalTasks=Number(state.room.totalTasksDone||0);
+  const goal=Number(state.room.taskGoal||12);
+
+  let winner=null;
+  if (aliveImpostors===0) winner="crew";
+  else if (aliveImpostors>=aliveCrew) winner="impostor";
+  else if (totalTasks>=goal) winner="crew";
+
+  if (winner) await state.roomRef.update({status:"ended",winner,endedAt:serverTime()});
+}
+
+function updateHUD() {
+  const role=state.me?.role;
+  $("roleLabel").textContent=role==="impostor"?"Cargo: INVASOR":"Cargo: TRIPULAÇÃO";
+  $("roleLabel").className="role "+(role==="impostor"?"impostor":"crew");
+  $("aliveLabel").textContent=state.me?.alive===false?"Você foi eliminado":"Você está vivo";
+  $("playerCountLabel").textContent=`${Object.keys(state.players||{}).length} jogadores`;
+  const pct=Math.min(100,(Number(state.room?.totalTasksDone||0)/Math.max(1,Number(state.room?.taskGoal||12)))*100);
+  $("taskProgress").style.width=pct+"%";
+}
+
+function showResult(winner) {
+  stopGameLoop();
+  $("meetingOverlay").classList.add("hidden");
+  const crew=winner==="crew";
+  $("resultTitle").textContent=crew?"TRIPULAÇÃO VENCEU":"INVASORES VENCERAM";
+  $("resultTitle").className="result-title "+(crew?"crew":"impostor");
+  $("resultText").textContent=crew?"Os invasores foram eliminados ou as tarefas foram concluídas.":"Os invasores dominaram a instalação.";
+  $("resultOverlay").classList.remove("hidden");
+}
+
+async function backToLobby() {
+  if (!state.roomRef) return;
+  if (state.host) {
+    const updates={status:"lobby",winner:null,votes:null,totalTasksDone:0,emergencyUsed:null};
+    for (const uid of Object.keys(state.players||{})) {
+      updates[`players/${uid}/ready`]=false;
+      updates[`players/${uid}/alive`]=true;
+      updates[`players/${uid}/role`]="crew";
+      updates[`players/${uid}/tasksDone`]=0;
+    }
+    await state.roomRef.update(updates);
+  } else {
+    $("resultOverlay").classList.add("hidden");
+    switchScreen("lobby");
+  }
+}
+
+async function sendChat(text, system=false) {
+  if (!state.roomRef) return;
+  const cleaned=cleanMessage(text);
+  if (!cleaned) return;
+  await state.roomRef.child("chat").push({
+    uid: system ? "system" : state.uid,
+    name: system ? "SISTEMA" : state.name,
+    text: cleaned,
+    at: serverTime()
+  });
+}
+
+function renderMessages(data,targetId) {
+  const box=$(targetId);
+  const rows=data?Object.values(data):[];
+  box.innerHTML="";
+  rows.sort((a,b)=>(a.at||0)-(b.at||0)).forEach(m=>{
+    const div=document.createElement("div");
+    div.className="msg";
+    const time=m.at?new Date(m.at).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}):"";
+    div.innerHTML=`<b>${escapeHtml(m.name||"Jogador")}</b><small>${time}</small><div>${escapeHtml(m.text||"")}</div>`;
+    box.appendChild(div);
+  });
+  box.scrollTop=box.scrollHeight;
+  if (targetId==="lobbyMessages") $("gameMessages").innerHTML=box.innerHTML;
+  if (targetId==="gameMessages") $("lobbyMessages").innerHTML=box.innerHTML;
+}
+
+function escapeHtml(str) {
+  return String(str??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+}
+
+async function leaveRoom(remove=true) {
+  try {
+    if (remove && state.playerRef) await state.playerRef.remove();
+    if (remove && state.host && state.roomRef) {
+      const remaining=Object.keys(state.players||{}).filter(uid=>uid!==state.uid);
+      if (remaining.length) await state.roomRef.child("hostId").set(remaining[0]);
+      else await state.roomRef.remove();
+    }
+  } catch(e) {}
+  cleanupListeners();
+  stopGameLoop();
+  state.roomCode=null; state.room=null; state.me=null; state.players={}; state.roomRef=null; state.playerRef=null;
+  $("meetingOverlay").classList.add("hidden");
+  $("resultOverlay").classList.add("hidden");
+  switchScreen("home");
+}
+
+function cleanupListeners() {
+  for (const [ref,event,cb] of state.listeners) ref.off(event,cb);
+  state.listeners=[];
+}
+
+function setupJoystick() {
+  const joy=$("joystick"), stick=$("stick");
+  let active=false, pointerId=null;
+
+  const update=(clientX,clientY)=>{
+    const r=joy.getBoundingClientRect();
+    const cx=r.left+r.width/2, cy=r.top+r.height/2;
+    let dx=clientX-cx, dy=clientY-cy;
+    const max=38, len=Math.hypot(dx,dy);
+    if (len>max) {dx=dx/len*max;dy=dy/len*max;}
+    state.joyX=dx/max; state.joyY=dy/max;
+    stick.style.transform=`translate(${dx}px,${dy}px)`;
+  };
+
+  joy.addEventListener("pointerdown",e=>{
+    active=true;pointerId=e.pointerId;joy.setPointerCapture(pointerId);update(e.clientX,e.clientY);
+  });
+  joy.addEventListener("pointermove",e=>{if(active&&e.pointerId===pointerId)update(e.clientX,e.clientY);});
+  const end=e=>{
+    if(e.pointerId!==pointerId)return;
+    active=false;pointerId=null;state.joyX=0;state.joyY=0;stick.style.transform="translate(0,0)";
+  };
+  joy.addEventListener("pointerup",end);
+  joy.addEventListener("pointercancel",end);
+}
+
+function bindUI() {
+  $("showJoinBtn").onclick=()=>$("joinArea").classList.toggle("hidden");
+  $("createRoomBtn").onclick=createRoom;
+  $("joinRoomBtn").onclick=joinRoom;
+  $("roomCodeInput").addEventListener("input",e=>e.target.value=e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,""));
+  $("roomCodeInput").addEventListener("keydown",e=>{if(e.key==="Enter")joinRoom();});
+
+  $("copyCodeBtn").onclick=async()=>{
+    await navigator.clipboard.writeText(state.roomCode||"");
+    $("copyCodeBtn").textContent="Copiado!";
+    setTimeout(()=>$("copyCodeBtn").textContent="Copiar código",1200);
+  };
+
+  $("readyBtn").onclick=toggleReady;
+  $("startGameBtn").onclick=startMatch;
+  $("leaveRoomBtn").onclick=()=>leaveRoom(true);
+
+  const sendLobby=()=>{
+    const input=$("lobbyChatInput"); const text=input.value; input.value="";
+    sendChat(text);
+  };
+  $("sendLobbyChatBtn").onclick=sendLobby;
+  $("lobbyChatInput").addEventListener("keydown",e=>{if(e.key==="Enter")sendLobby();});
+
+  $("gameChatBtn").onclick=()=>{
+    $("gameChatOverlay").classList.remove("hidden");
+    renderMessages(state.room?.chat||{}, "gameMessages");
+  };
+  $("closeGameChatBtn").onclick=()=>$("gameChatOverlay").classList.add("hidden");
+  const sendGame=()=>{
+    const input=$("gameChatInput");const text=input.value;input.value="";
+    sendChat(text);
+  };
+  $("sendGameChatBtn").onclick=sendGame;
+  $("gameChatInput").addEventListener("keydown",e=>{if(e.key==="Enter")sendGame();});
+
+  $("taskBtn").onclick=performTask;
+  $("eliminateBtn").onclick=eliminatePlayer;
+  $("meetingBtn").onclick=callMeeting;
+  $("skipVoteBtn").onclick=skipVote;
+  $("backLobbyBtn").onclick=backToLobby;
+
+  addEventListener("keydown",e=>{
+    const tag=document.activeElement?.tagName;
+    if(tag==="INPUT"||tag==="TEXTAREA") return;
+    state.keys[e.key.toLowerCase()]=true;
+  });
+  addEventListener("keyup",e=>state.keys[e.key.toLowerCase()]=false);
+  addEventListener("beforeunload",()=>{ if(state.playerRef) state.playerRef.remove(); });
+}
+
+async function boot() {
+  bindUI();
+  setupJoystick();
+  $("playerName").value=localStorage.getItem("invasores_name")||"";
+  try {
+    await ensureAuth();
+  } catch(err) {
+    console.error(err);
+    setStatus("Firebase não conectou: "+friendlyFirebaseError(err),true);
+  }
+}
+
+boot();
+</script>
+</body>
+</html>
